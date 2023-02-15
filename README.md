@@ -1,4 +1,4 @@
-[![CI](https://github.com/locize/xliff/actions/workflows/ci.yml/badge.svg)](https://github.com/locize/xliff/actions/workflows/ci.yml) [![travis](https://img.shields.io/travis/locize/xliff.svg)](https://travis-ci.org/locize/xliff) [![npm](https://img.shields.io/npm/v/xliff.svg)](https://npmjs.org/package/xliff)
+[![CI](https://github.com/chmerk/xliff2/actions/workflows/ci.yml/badge.svg)](https://github.com/chmerk/xliff2/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/xliff2.svg)](https://npmjs.org/package/xliff2)
 
 # XLIFF2
 This is a fork of the [locize/xliff](https://github.com/locize/xliff) project to fix the XLIFF2 behaviour which is incorrect or incomplete in several aspects.
