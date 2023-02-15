@@ -934,10 +934,24 @@ var xliffToJsClb = function xliffToJsClb(str, options, cb) {
 function createUnits(parent, initValues) {
   if (!parent.elements) return {};
   return parent.elements.reduce(function (file, unit) {
-    var key = unit.attributes.id;
-    var additionalAttributes = unit.attributes;
-    delete additionalAttributes.id;
+    var key;
+    var additionalAttributes = {};
+    if (unit.name === 'notes') {
+      key = 'notes';
+    } else {
+      key = unit.attributes.id;
+      additionalAttributes = unit.attributes;
+      delete additionalAttributes.id;
+    }
     switch (unit.name) {
+      case 'notes':
+        if (!file.notes) {
+          file.notes = [];
+        }
+        unit.elements.forEach(function (noteElement) {
+          file.notes.push(noteElement.elements[0].text);
+        });
+        return file;
       case 'unit':
         file[key] = createUnit(unit, initValues);
         if (Object.keys(additionalAttributes).length) {
@@ -947,9 +961,7 @@ function createUnits(parent, initValues) {
         }
         return file;
       case 'group':
-        file[key] = {
-          groupUnits: createUnits(unit, initValues)
-        };
+        file[key] = createUnits(unit, initValues);
         if (Object.keys(additionalAttributes).length) {
           Object.assign(file[key], {
             additionalAttributes: additionalAttributes
@@ -963,8 +975,45 @@ function createUnits(parent, initValues) {
 }
 function createUnit(unit, initValues) {
   if (!unit.elements) return undefined;
+  var jsonUnit = {};
+  var allSegmentsHaveId = true;
+  unit.elements.forEach(function (element) {
+    if (element.name === 'notes') {
+      if (!jsonUnit.notes) {
+        jsonUnit.notes = [];
+      }
+      element.elements.forEach(function (noteElement) {
+        jsonUnit.notes.push(noteElement.elements[0].text);
+      });
+    }
+    if (element.name === 'segment') {
+      if (!element.attributes || !element.attributes.id) {
+        allSegmentsHaveId = false;
+      }
+    }
+  });
+  if (allSegmentsHaveId) {
+    unit.elements.forEach(function (element) {
+      if (element.name === 'segment') {
+        jsonUnit[element.attributes.id] = createSegmentWithId(element);
+      }
+    });
+  } else {
+    return createSegment(unit, initValues);
+  }
+  return jsonUnit;
+}
+function createSegmentWithId(segmentElement) {
+  var segment = {};
+  segmentElement.elements.forEach(function (element) {
+    var value = (0, _xmlToObject.extractValue)(element.elements, _ElementTypes.default);
+    segment[element.name] = value;
+  });
+  return segment;
+}
+function createSegment(unit, initValues) {
   return unit.elements.reduce(function (unit, segment) {
-    if (['segment', 'notes'].indexOf(segment.name) < 0) return unit;
+    console.log('SEGMENT:', segment);
     segment.elements.forEach(function (element) {
       var value = (0, _xmlToObject.extractValue)(element.elements, _ElementTypes.default);
       switch (element.name) {
