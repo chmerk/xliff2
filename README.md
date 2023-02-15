@@ -264,6 +264,268 @@ Even if someone already uses IDs or multiple segments, the content of `my-unit.s
 
 # Original locize/xliff readme
 
+# XLIFF2
+This is a fork of the [locize/xliff](https://github.com/locize/xliff) project to fix the XLIFF2 behaviour which is incorrect or incomplete in several aspects.
+
+The details will be explained in a few examples below. The goal is that this will be merged to the locize/xliff project.
+But as this was a rather time-critical issue in our project, we decided to publish it like this for now.
+
+This was forked from locize/xliff 6.1.0, from which also the examples and quotes are taken.
+
+The examples and quotes from the official XLIFF 2.0 documentation are taken from: http://docs.oasis-open.org/xliff/xliff-core/v2.0/os/xliff-core-v2.0-os.html
+
+## What's wrong with locize XLIFF2 conversion?
+
+Let's first look at the upper part of [locize's original example](#xliff-20)
+
+```js
+  <file id="namespace1">
+    <unit id="key1">
+      <segment>
+        <source>Hello</source>
+        <target>Hallo</target>
+      </segment>
+    </unit>
+    <unit id="key2">
+      <segment>
+        <source>An application to manipulate and process XLIFF documents</source>
+        <target>Eine Applikation um XLIFF Dokumente zu manipulieren und verarbeiten</target>
+      </segment>
+    </unit>
+```
+
+will compile to 
+
+```json
+{"resources": {
+    "namespace1": {
+      "key1": {
+        "source": "Hello",
+        "target": "Hallo"
+      },
+      "key2": {
+        "source": "An application to manipulate and process XLIFF documents",
+        "target": "Eine Applikation um XLIFF Dokumente zu manipulieren und verarbeiten"
+      }
+```
+
+### Multiple segments
+This is not wrong by itself. (The exact transformation logic is not prescribed). But let's look at a slightly extended example to see one of the limitations.
+XLIFF defines units as 
+> "Static container for a dynamic structure of elements holding the extracted translatable source text, aligned with the Translated text." 
+
+and consequently explicitly allows (besides others) "One or more `<segment>` attributes". This is very useful, to keep 
+related text fragments, e.g. of one template, view or UI element together.
+But if we put this in locize/xliff2js:
+```js
+  <file id="namespace1">
+    <unit id="key1">
+      <segment>
+        <source>Hello</source>
+        <target>Hallo</target>
+      </segment>
+      <segment>
+        <source>Good Bye</source>
+        <target>Auf Wiederluaga</target>
+      </segment>
+    </unit>
+...
+```
+
+it will compile to
+
+```json
+{"resources": {
+    "namespace1": {
+      "key1": {
+        "source": "Good Bye",
+        "target": "Auf Wiederluaga"
+      }
+      ...
+```
+So, only the last segment of the unit will make it into the resulting JS. The expected result would probably look like:
+```json
+{"resources": {
+    "namespace1": {
+      "key1": [
+        {
+          "source": "Hallo",
+          "target": "Hello"
+        },
+        {
+          "source": "Good Bye",
+          "target": "Auf Wiederluaga"
+        }
+      ],
+      ...
+```
+
+### Segments with IDs
+Another thing that is problematic, is when segments are used with IDs. With the applied logic, where only one segment in 
+a unit can be used and the ID of the unit will be used for the result in the JSON, this is of course not a problem. 
+But to structure (and be able to use) the fragments, they might often be identified with IDs. 
+
+Using IDs is explicitly allowed, however optional in XLIFF 2.
+
+In the current implementation of locize
+```xml
+  <file id="namespace1">
+    <unit id="key1">
+      <segment id="hello">
+        <source>Hello</source>
+        <target>Hallo</target>
+      </segment>
+      <segment id="goodBye">
+        <source>Good Bye</source>
+        <target>Auf Wiederluaga</target>
+      </segment>
+    </unit>
+...
+```
+will still compile to 
+
+```json
+{"resources": {
+    "namespace1": {
+      "key1": {
+        "source": "Good Bye",
+        "target": "Auf Wiederluaga"
+      }
+      ...
+```
+
+So the segment id is completely ignored. Now, while it can be debated, which would be the correct approach (also considering 
+that theoretically the segments could also be "mixed" (with and without ID)), this result is definitely not very helpful. 
+
+As we use the IDs to select the elements for the higher levels (file, group, unit) which is very handy in many cases, 
+this would also be beneficial (and probably expected) here:
+
+```json
+{"resources": {
+    "namespace1": {
+      "key1": {
+        "hallo": {
+          "source": "Hallo",
+          "target": "Hello"
+        },
+        "goodBye": {
+          "source": "Good Bye",
+          "target": "Auf Wiederluaga"
+        }
+      },
+      ...
+```
+
+### Groups
+Now, let's look at the lower part of the xliff example (IDs adjusted):
+
+```xml
+    ...
+    <group id="my-group">
+      <unit id="my-unit">
+        <segment>
+          <source>Group</source>
+          <target>Gruppe</target>
+        </segment>
+      </unit>
+    </group>
+```
+will compile to:
+
+```json
+    ...
+      "my-group": {
+        "groupUnits":{
+          "my-unit": {
+            "source": "Group",
+            "target": "Gruppe"
+          }
+        }
+      }
+```
+As can be easily seen, xliff creates an additional "artificial" level (object) "groupUnits" in the JSON result.
+
+Again, this is not wrong by itself but brings unnecessary complexity and can bear problems in the usage:
+
+XLIFF 2.0 definition for group is
+> Provides a way to organize units into a structured hierarchy.
+> Note that this is especially useful for mirroring a source format's hierarchical structure.
+
+and allows a group to contain units or again groups. With this complex, versatile structures can be created (where necessary), 
+to match virtually every imaginable use case. 
+
+But if every level will be mapped to 2 levels in the JSON result this will cause unnecessary implementation effort and 
+additional logic in some cases (and it becomes difficult, to "mirror a source format's hierarchical structure". 
+On the other hand, the added level bring few to no effective benefits:
+
+There are typically multiple units within a group. Groups and units must have an ID in XLIFF 2. (https://docs.oasis-open.org/xliff/xliff-core/v2.0/os/xliff-core-v2.0-os.html#group)
+Additionally, "The value MUST be unique among all <unit> id attribute values within the enclosing <file> element."
+
+So, there is no ambiguity and units can always be accessed with `my-group.my-unit`. In contrast, the xliff result would
+have to use `my-group.groupUnits.my-unit`. So there are no apparent benefits, such as easier iteration.
+
+## Solution approach
+
+### (Multiple) segments with IDs shall be supported 
+
+"Unnamed" segments (without ID) are not used in our project, so they are neglected for now. This also enables to create some 
+downwards compatibility for now.
+
+However, if all segments within a unit have an ID, they shall definitely all be compiled and named by ID in the result.
+
+If there is one segment without ID in the unit, the current logic can be kept for now.
+
+Eventually, the following might make sense: 
+ * One or more segments with IDs in a unit => Create objects with IDs as name `my-unit.my-segment.target`
+ * Multiple segments without IDs in a unit => Create an array with unnamed objects `my-unit[2].target`
+ * One segment without ID in a unit => TBD, either also an array `my-unit[2].target` (which would be consequent)
+   or directly accessible via unit ID (as current implementation) `my-unit.target`
+ * Mixed: segments with and without ID in a unit => TBD. Proposal: Separate so IDs can directly be used, rest in an array
+   `my-unit.my-segment.target` AND `my-unit[2].target`. 
+
+### Groups shall not generate an additional object level
+
+As files and units, groups shall just be compiled into a regular object with their ID as name. No additional steps necessary.
+However, it must be regarded, that groups can be nested. Therefore, the implementation should be recursive.
+
+## State of this implementation
+
+### Works:
+* Multiple segments with IDs are supported and become single "named" objects in the result, which can be accessed by their name (ID)
+* Groups are compiled "directly", without adding an additional object/level
+* "Fallback": If a unit contains segments without ID, only the last segment is compiled directly under the unit ID (like locize/xliff)
+
+### Doesn't work:
+* Compile multiple unnamed segments into array -> only last segment will go into result (see above)
+* Compile mixed (segments with and w/o id) segments into named objects (id) AND array (w/o id) -> only last segment will go into result (see above)
+
+### Unknown:
+* Nested groups (e.g. unit in group in group)
+* Other elements like `<data>`, `<ignorable>`, `<mrk>`, ...
+* Edge cases like same id for a unit and group on same level (this is possible in XLIFF)
+
+## Proposal for implementation in locize/xliff
+
+### v6.x (Minor update, no breaking change)
+* Add support for segments with IDs (as implemented here): Named objects
+* Optionally also add support for multiple unnamed segments in unit: Array
+* Optionally also add support for "mixed" units: Named objects (for segments with IDs) AND array (for segments w/o ID)
+* Keep support for single/last (unnamed) segment for compatibility reasons: Always compile last segment in unit, directly into "source" and "target" fields of unit.
+
+This would not cause any breaking changes if the tool is used as intended in the examples below.
+Even if someone already uses IDs or multiple segments, the content of `my-unit.source` and `my-unit.target` would still be the same.
+
+### v7 (Major update, breaking changes)
+* Drop generation of additional "groupUnits" object.
+* Add support of nested groups (if not already present, didn't test)
+* Add support for multiple unnamed segments in unit (array), if not done in v6
+* Add support for "mixed" units, if not done in v6
+* Potentially, drop support for single/last segment to be compiled directly in unit to keep result structure clean. (Maybe also later)
+
+
+
+# Original locize/xliff readme
+
 ## Download
 
 The source is available for download from
