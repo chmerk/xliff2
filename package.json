@@ -1,5 +1,5 @@
 {
-  "name": "xliff",
+  "name": "xliff2",
   "version": "1.0.0-beta.1",
   "description": "xliff2js and js2xliff converter xliff utils",
   "type": "module",
@@ -156,11 +156,11 @@
     "js",
     "translation"
   ],
-  "author": "adrai",
+  "author": "adrai, chmerk",
   "license": "MIT",
   "homepage": "http://locize.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/locize/xliff.git"
+    "url": "git+https://github.com/chmerk/xliff2.git"
   }
 }
