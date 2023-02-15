@@ -67,9 +67,7 @@ But if we put this in locize/xliff2js:
     </unit>
 ...
 ```
-
 it will compile to
-
 ```json
 {"resources": {
     "namespace1": {
@@ -79,7 +77,8 @@ it will compile to
       }
       ...
 ```
-So, only the last segment of the unit will make it into the resulting JS. The expected result would probably look like:
+So, only the last segment of the unit will make it into the resulting JS. The expected result would probably look as 
+follows (note the array!):
 ```json
 {"resources": {
     "namespace1": {
@@ -187,18 +186,20 @@ XLIFF 2.0 definition for group is
 > Provides a way to organize units into a structured hierarchy.
 > Note that this is especially useful for mirroring a source format's hierarchical structure.
 
-and allows a group to contain units or again groups. With this complex, versatile structures can be created (where necessary), 
+and allows a group to contain units or again groups. 
+With this possibility, complex and versatile structures can be created (where necessary), 
 to match virtually every imaginable use case. 
 
-But if every level will be mapped to 2 levels in the JSON result this will cause unnecessary implementation effort and 
-additional logic in some cases (and it becomes difficult, to "mirror a source format's hierarchical structure". 
-On the other hand, the added level bring few to no effective benefits:
+But if every level will be mapped to two levels in the JSON result this will cause unnecessary implementation effort and 
+additional logic in some cases (and it becomes difficult, to "mirror a source format's hierarchical structure"). 
+On the other hand, the added level brings few to no apparent benefits:
 
-There are typically multiple units within a group. Groups and units must have an ID in XLIFF 2. (https://docs.oasis-open.org/xliff/xliff-core/v2.0/os/xliff-core-v2.0-os.html#group)
-Additionally, "The value MUST be unique among all <unit> id attribute values within the enclosing <file> element."
+There are typically multiple units within a group. Groups and units must have an ID in XLIFF 2 
+(https://docs.oasis-open.org/xliff/xliff-core/v2.0/os/xliff-core-v2.0-os.html#group). 
+Additionally, "the value (id) MUST be unique among all `<unit>` id attribute values within the enclosing <file> element."
 
 So, there is no ambiguity and units can always be accessed with `my-group.my-unit`. In contrast, the xliff result would
-have to use `my-group.groupUnits.my-unit`. So there are no apparent benefits, such as easier iteration.
+have to use `my-group.groupUnits.my-unit`.
 
 ## Solution approach
 
@@ -231,9 +232,10 @@ However, it must be regarded, that groups can be nested. Therefore, the implemen
 * Groups are compiled "directly", without adding an additional object/level
 * "Fallback": If a unit contains segments without ID, only the last segment is compiled directly under the unit ID (like locize/xliff)
 
-### Doesn't work:
+### Doesn't work (yet):
 * Compile multiple unnamed segments into array -> only last segment will go into result (see above)
 * Compile mixed (segments with and w/o id) segments into named objects (id) AND array (w/o id) -> only last segment will go into result (see above)
+* TESTS!!!
 
 ### Unknown:
 * Nested groups (e.g. unit in group in group)
